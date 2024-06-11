@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text</title>
+</head>
+<body>
+    <h1>Speech to Text</h1>
+    <button id="startRecordingButton">Start Recording</button>
+    <button id="stopRecordingButton" style="display: none;">Stop Recording</button>
+    <p id="result"></p>
+
+    <script>
+        const startRecordingButton = document.getElementById('startRecordingButton');
+        const stopRecordingButton = document.getElementById('stopRecordingButton');
+        const result = document.getElementById('result');
+        let mediaRecorder;
+        let audioChunks = [];
+
+        startRecordingButton.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'recording.webm');
+
+                    try {
+                        const response = await fetch('/record', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const resultData = await response.json();
+                        if (resultData.error) {
+                            result.textContent = `Error: ${resultData.error}`;
+                        } else {
+                            result.textContent = `คุณพูดว่า: ${resultData.text}`;
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        result.textContent = 'An error occurred while processing the audio.';
+                    }
+
+                    audioChunks = [];
+                };
+
+                mediaRecorder.start();
+                startRecordingButton.style.display = 'none';
+                stopRecordingButton.style.display = 'inline';
+            } catch (error) {
+                console.error('Error accessing media devices.', error);
+                alert('เกิดข้อผิดพลาดในการเข้าถึงไมโครโฟน');
+            }
+        });
+
+        stopRecordingButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                startRecordingButton.style.display = 'inline';
+                stopRecordingButton.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
